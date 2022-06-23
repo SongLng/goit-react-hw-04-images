@@ -1,4 +1,5 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
+
 import { Oval } from 'react-loader-spinner';
 import { ToastContainer } from 'react-toastify';
 import { ServiceAPI } from '../service/API';
@@ -7,51 +8,51 @@ import { Searchbar } from '../components/Searchbar/Searchbar';
 import { Button } from '../components/Button/Button';
 import { Modal } from '../components/Modal/Modal';
 import '../components/styles.css';
-export class App extends Component {
-  state = {
-    query: '',
-    data: [],
-    page: 1,
-    error: null,
-    status: 'idle',
-    showModal: false,
-    imgId: null,
-    total: 0,
-  };
 
-  componentDidUpdate(prevProps, prevState) {
-    if (this.state.query !== prevState.query) {
-      this.setState({ status: 'pending', data: [], page: 1 }, this.getPicture);
+export function App() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [data, setData] = useState([]);
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState(null);
+  const [status, setStatus] = useState('idle');
+  const [showModal, setShowModal] = useState(false);
+  const [imgId, setImgId] = useState(null);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    if (!searchQuery) {
+      return;
     }
-    if (this.state.page !== prevState.page && this.state.page !== 1) {
-      this.setState({ status: 'pending' }, this.getPicture);
-    }
-  }
 
-  getPicture = () => {
-    const { query } = this.state;
-    const { page } = this.state;
-    ServiceAPI(query, page)
-      .then(this.dataProcessing)
-      .catch(error => this.setState({ error, status: 'rejected' }));
-  };
+    const getPicture = () => {
+      setStatus('pending');
+      ServiceAPI(searchQuery, page)
+        .then(dataProcessing)
+        .catch(error => {
+          setError(error);
+          setStatus('rejected');
+        });
+    };
+    getPicture();
+  }, [page, searchQuery]);
 
-  dataProcessing = response => {
+  const dataProcessing = response => {
     const { hits: dataArray, totalHits } = response.data;
 
     if (!dataArray.length) {
-      this.setState({
-        status: 'rejected',
-        error: new Error('Try to change the request'),
-      });
+      setStatus('rejected');
+      setError(
+        new Error('Something went wrong, please change the request please')
+      );
       return;
     }
+
     window.scrollBy({
       top: document.body.clientHeight,
       behavior: 'smooth',
     });
 
-    const newData = dataArray.map(data => {
+    const data = dataArray.map(data => {
       const {
         id,
         largeImageURL: imageURL,
@@ -60,81 +61,71 @@ export class App extends Component {
       } = data;
       return { id, imageURL, src, alt };
     });
-    return this.setState(({ data }) => {
-      return {
-        data: [...data, ...newData],
-        total: totalHits,
-        status: 'resolved',
-      };
-    });
+    setData(state => [...state, ...data]);
+    setTotal(totalHits);
+    setStatus('resolved');
   };
 
-  handleSubmit = searchQuery => {
-    if (this.state.query !== searchQuery) {
-      this.setState({ query: searchQuery });
+  const handleSubmit = newSearchQuery => {
+    if (searchQuery !== newSearchQuery) {
+      setSearchQuery(newSearchQuery);
+      setPage(1);
+      setData([]);
     }
     return;
   };
 
-  handleLoadMore = () => {
-    this.setState(({ page }) => {
-      return { page: page + 1 };
-    });
+  const handleLoadMore = () => {
+    setPage(state => state + 1);
   };
 
-  toggleModal = () => {
-    this.setState(({ showModal }) => ({ showModal: !showModal }));
+  const toggleModal = () => {
+    setShowModal(state => !state);
   };
 
-  clickOnImage = id => {
-    this.setState({ imgId: id });
-    this.toggleModal();
+  const clickOnImage = id => {
+    setImgId(id);
+    toggleModal();
   };
 
-  handleData = () => {
-    return this.state.data.find(img => img.id === this.state.imgId);
+  const handleData = () => {
+    return data.find(data => data.id === imgId);
   };
 
-  render() {
-    const { status, error, data, showModal, total } = this.state;
+  return (
+    <div className="App">
+      <Searchbar onSubmit={handleSubmit} />
+      {data.length > 0 && <ImageGallery data={data} onClick={clickOnImage} />}
+      {status === 'resolved' && data.length > 0 && data.length < total && (
+        <>
+          <Button onClick={handleLoadMore} />
+        </>
+      )}
+      <ToastContainer />
+      {status === 'pending' && (
+        <div className="Oval">
+          <Oval
+            ariaLabel="loading-indicator"
+            height={100}
+            width={100}
+            strokeWidth={5}
+            color="white"
+            secondaryColor="#3f51b5"
+          />
+        </div>
+      )}
 
-    return (
-      <div className="App">
-        <Searchbar onSubmit={this.handleSubmit} />
-        {data.length > 0 && (
-          <ImageGallery data={this.state.data} onClick={this.clickOnImage} />
-        )}
-        {status === 'resolved' && data.length > 0 && data.length < total && (
-          <>
-            <Button onClick={this.handleLoadMore} />
-          </>
-        )}
-        <ToastContainer />
-        {status === 'pending' && (
-          <div className="Oval">
-            <Oval
-              ariaLabel="loading-indicator"
-              height={100}
-              width={100}
-              strokeWidth={5}
-              color="white"
-              secondaryColor="#3f51b5"
-            />
-          </div>
-        )}
+      {status === 'rejected' && (
+        <div className={ImageGallery}>
+          <p>{`There are no such an image ${error}`}</p>
+        </div>
+      )}
 
-        {status === 'rejected' && (
-          <div className={ImageGallery}>
-            <p>{`There are no such an image ${error}`}</p>
-          </div>
-        )}
-
-        {showModal && (
-          <Modal onClose={this.toggleModal}>
-            <img src={this.handleData().imageURL} alt={this.handleData().alt} />
-          </Modal>
-        )}
-      </div>
-    );
-  }
+      {showModal && (
+        <Modal onClose={toggleModal}>
+          <img src={handleData().imageURL} alt={handleData().alt} />
+        </Modal>
+      )}
+    </div>
+  );
 }

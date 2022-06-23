@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import '../styles.css';
+
 export const ImageGalleryItem = ({ images }) => {
   return (
     <li className="ImageGalleryItem" key={images.id}>
@@ -14,7 +15,7 @@ export const ImageGalleryItem = ({ images }) => {
 };
 
 ImageGalleryItem.propTypes = {
-  images: PropTypes.arrayOf(
+  images: PropTypes.objectOf(
     PropTypes.shape({
       id: PropTypes.number.isRequired,
       src: PropTypes.string.isRequired,
